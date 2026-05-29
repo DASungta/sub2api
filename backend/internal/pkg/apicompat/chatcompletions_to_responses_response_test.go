@@ -169,7 +169,7 @@ func TestChatCompletionsToResponsesResponse_ReasoningTokenUsage(t *testing.T) {
 			PromptTokens:            3,
 			CompletionTokens:        7,
 			TotalTokens:             10,
-			CompletionTokensDetails: &ChatCompletionTokenDetails{ReasoningTokens: 5},
+			CompletionTokensDetails: &ChatTokenDetails{ReasoningTokens: 5},
 		},
 	}
 	out := ChatCompletionsToResponsesResponse(resp, "gpt-4o")
