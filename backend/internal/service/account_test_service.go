@@ -187,7 +187,20 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 			testModelID = openai.DefaultTestModel
 		}
 		testModelID = account.GetMappedModel(testModelID)
-		return s.testOpenAIChatCompletionsConnection(c, account, testModelID)
+
+		authToken := account.GetUpstreamAPIKey()
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		ccURL := account.GetOpenAIChatCompletionsURL()
+		if ccURL == "" {
+			return s.sendErrorAndEnd(c, "No chat_completions_url configured for this account")
+		}
+		normalizedBaseURL, err := s.validateUpstreamBaseURL(ccURL)
+		if err != nil {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid chat_completions_url: %s", err.Error()))
+		}
+		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
 	}
 
 	// Route to platform-specific test method
@@ -523,7 +536,19 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 	// apikey-chat-completions accounts use the CC endpoint directly
 	if account.Type == AccountTypeAPIKeyChatCompletions {
-		return s.testOpenAIChatCompletionsConnection(c, account, testModelID)
+		authToken := account.GetUpstreamAPIKey()
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		ccURL := account.GetOpenAIChatCompletionsURL()
+		if ccURL == "" {
+			return s.sendErrorAndEnd(c, "No chat_completions_url configured for this account")
+		}
+		normalizedBaseURL, err := s.validateUpstreamBaseURL(ccURL)
+		if err != nil {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid chat_completions_url: %s", err.Error()))
+		}
+		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
 	}
 
 	// Route to image generation test if an image model is selected
@@ -1678,67 +1703,6 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 
 	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 	return nil
-}
-
-// testOpenAIChatCompletionsConnection tests an apikey-chat-completions account by sending
-// a streaming Chat Completions request to the configured chat_completions_url.
-func (s *AccountTestService) testOpenAIChatCompletionsConnection(c *gin.Context, account *Account, testModelID string) error {
-	ctx := c.Request.Context()
-
-	authToken := account.GetUpstreamAPIKey()
-	if authToken == "" {
-		return s.sendErrorAndEnd(c, "No API key available")
-	}
-
-	ccURL := account.GetOpenAIChatCompletionsURL()
-	if ccURL == "" {
-		return s.sendErrorAndEnd(c, "No chat_completions_url configured for this account")
-	}
-	if _, err := s.validateUpstreamBaseURL(ccURL); err != nil {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid chat_completions_url: %s", err.Error()))
-	}
-
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	c.Writer.Flush()
-
-	payloadBytes, _ := json.Marshal(createOpenAICCTestPayload(testModelID))
-	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ccURL, bytes.NewReader(payloadBytes))
-	if err != nil {
-		return s.sendErrorAndEnd(c, "Failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+authToken)
-	req.Header.Set("Accept", "text/event-stream")
-
-	proxyURL := ""
-	if account.ProxyID != nil && account.Proxy != nil {
-		proxyURL = account.Proxy.URL()
-	}
-
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
-	if err != nil {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode == http.StatusTooManyRequests {
-			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
-		}
-		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
-			errMsg := fmt.Sprintf("Authentication failed (401): %s", string(body))
-			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
-		}
-		return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(body)))
-	}
-
-	return s.processOpenAICCStream(c, resp.Body)
 }
 
 // createOpenAICCTestPayload creates a Chat Completions format test payload.
