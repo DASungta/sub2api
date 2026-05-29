@@ -136,3 +136,18 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+
+# ===================
+# 本地维护专用（fork 私有，勿提交上游）
+# ===================
+# 本地 AI 工具产物
+.ai/
+# 服务器部署脚本（含内网 IP 与凭据，严禁提交）
+deploy/deploy-to-server.sh
+# 一次性 newapi/codex 渠道导入脚本与数据
+import-newapi-codex-channels-*.mjs
+newapi-codex-channels-*.json
+# npm 残留锁文件（项目使用 pnpm）
+frontend/package-lock.json
+# 合并冲突备份
+*.orig
