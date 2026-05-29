@@ -1481,6 +1481,18 @@
               }}
             </p>
           </div>
+          <div v-if="poolModeEnabled" class="mt-3">
+            <label class="input-label">{{ t('admin.accounts.poolModeRetryStatusCodes') }}</label>
+            <input
+              v-model="poolModeRetryStatusCodesInput"
+              type="text"
+              class="input"
+              :placeholder="DEFAULT_POOL_MODE_RETRY_STATUS_CODES.join(', ')"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.poolModeRetryStatusCodesHint', { default: DEFAULT_POOL_MODE_RETRY_STATUS_CODES.join(', ') }) }}
+            </p>
+          </div>
         </div>
 
         <!-- Custom Error Codes Section -->
@@ -1824,6 +1836,18 @@
                   max: MAX_POOL_MODE_RETRY_COUNT
                 })
               }}
+            </p>
+          </div>
+          <div v-if="poolModeEnabled" class="mt-3">
+            <label class="input-label">{{ t('admin.accounts.poolModeRetryStatusCodes') }}</label>
+            <input
+              v-model="poolModeRetryStatusCodesInput"
+              type="text"
+              class="input"
+              :placeholder="DEFAULT_POOL_MODE_RETRY_STATUS_CODES.join(', ')"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.poolModeRetryStatusCodesHint', { default: DEFAULT_POOL_MODE_RETRY_STATUS_CODES.join(', ') }) }}
             </p>
           </div>
         </div>
@@ -2630,7 +2654,10 @@
       </div>
 
       <div>
-        <label class="input-label">{{ t('admin.accounts.proxy') }}</label>
+        <div class="mb-1 flex items-center gap-2">
+          <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
+          <ProxyAdBanner />
+        </div>
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
       </div>
 
@@ -2837,6 +2864,56 @@
           <button type="button" @click="addOpenAICompactModelMapping" class="btn btn-secondary text-sm">
             + {{ t('admin.accounts.addMapping') }}
           </button>
+        </div>
+      </div>
+
+      <!-- OpenAI APIKey Responses API support mode -->
+      <div
+        v-if="form.platform === 'openai' && accountCategory === 'apikey'"
+        class="space-y-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.openai.responsesMode') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.responsesModeDesc') }}
+            </p>
+          </div>
+          <div class="w-56">
+            <Select
+              v-model="openAIResponsesMode"
+              :options="openAIResponsesModeOptions"
+              :disabled="!openAITextGenerationCapabilityEnabled"
+              data-testid="openai-responses-mode-select"
+            />
+          </div>
+        </div>
+        <p
+          v-if="!openAITextGenerationCapabilityEnabled"
+          class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+          data-testid="openai-responses-mode-not-applicable"
+        >
+          {{ t('admin.accounts.openai.responsesModeTextDisabledHint') }}
+        </p>
+        <div>
+          <label class="input-label mb-2 block">{{ t('admin.accounts.openai.endpointCapabilities') }}</label>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label
+              v-for="option in openAIEndpointCapabilityOptions"
+              :key="option.value"
+              class="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-dark-600"
+            >
+              <input
+                type="checkbox"
+                class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500"
+                :data-testid="`openai-endpoint-capability-${option.value}`"
+                :checked="openAIEndpointCapabilities.includes(option.value)"
+                @change="toggleOpenAIEndpointCapability(option.value, $event)"
+              />
+              <span class="text-gray-700 dark:text-gray-200">{{ option.label }}</span>
+            </label>
+          </div>
+          <p class="input-hint">{{ t('admin.accounts.openai.endpointCapabilitiesDesc') }}</p>
         </div>
       </div>
 
@@ -3341,13 +3418,16 @@ import type {
   CheckMixedChannelResponse,
   CreateAccountRequest,
   CodexSessionImportMessage,
-  OpenAICompactMode
+  OpenAICompactMode,
+  OpenAIResponsesMode,
+  OpenAIEndpointCapability
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
+import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
@@ -3491,8 +3571,27 @@ const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
+const DEFAULT_POOL_MODE_RETRY_STATUS_CODES = [401, 403, 429]
 const poolModeEnabled = ref(false)
 const poolModeRetryCount = ref(DEFAULT_POOL_MODE_RETRY_COUNT)
+const poolModeRetryStatusCodesInput = ref('')
+
+function parsePoolModeRetryStatusCodes(input: string): number[] {
+  if (!input || !input.trim()) return []
+  const seen = new Set<number>()
+  const out: number[] = []
+  for (const token of input.split(/[,\s]+/)) {
+    const trimmed = token.trim()
+    if (!trimmed) continue
+    const n = Number(trimmed)
+    if (!Number.isFinite(n) || !Number.isInteger(n)) continue
+    if (n < 100 || n > 599) continue
+    if (seen.has(n)) continue
+    seen.add(n)
+    out.push(n)
+  }
+  return out.sort((a, b) => a - b)
+}
 const customErrorCodesEnabled = ref(false)
 const selectedErrorCodes = ref<number[]>([])
 const customErrorCodeInput = ref<number | null>(null)
@@ -3501,6 +3600,8 @@ const autoPauseOnExpired = ref(true)
 const stripReasoningEffortOnCC = ref(false)
 const openaiPassthroughEnabled = ref(false)
 const openAICompactMode = ref<OpenAICompactMode>('auto')
+const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
+const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const codexCLIOnlyEnabled = ref(false)
@@ -3558,6 +3659,63 @@ const openAICompactModeOptions = computed(() => [
   { value: 'force_on', label: t('admin.accounts.openai.compactModeForceOn') },
   { value: 'force_off', label: t('admin.accounts.openai.compactModeForceOff') }
 ])
+const openAIResponsesModeOptions = computed(() => [
+  { value: 'auto', label: t('admin.accounts.openai.responsesModeAuto') },
+  { value: 'force_responses', label: t('admin.accounts.openai.responsesModeForceResponses') },
+  { value: 'force_chat_completions', label: t('admin.accounts.openai.responsesModeForceChatCompletions') }
+])
+const openAITextEndpointCapabilityLabel = computed(() => {
+  if (openAIResponsesMode.value === 'force_responses') {
+    return t('admin.accounts.openai.capabilityResponses')
+  }
+  if (openAIResponsesMode.value === 'force_chat_completions') {
+    return t('admin.accounts.openai.capabilityChatCompletions')
+  }
+  return t('admin.accounts.openai.capabilityTextAuto')
+})
+const openAIEndpointCapabilityOptions = computed<{ value: OpenAIEndpointCapability; label: string }[]>(() => [
+  { value: 'chat_completions', label: openAITextEndpointCapabilityLabel.value },
+  { value: 'embeddings', label: t('admin.accounts.openai.capabilityEmbeddings') }
+])
+const openAITextGenerationCapabilityEnabled = computed(() =>
+  openAIEndpointCapabilities.value.includes('chat_completions')
+)
+
+const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
+  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings']
+  const selected = allowed.filter((value) => values.includes(value))
+  return selected.length > 0 ? selected : allowed
+}
+
+const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, event?: Event) => {
+  if (openAIEndpointCapabilities.value.includes(capability)) {
+    if (openAIEndpointCapabilities.value.length <= 1) {
+      const input = event?.target as HTMLInputElement | null
+      if (input) input.checked = true
+      return
+    }
+    openAIEndpointCapabilities.value = openAIEndpointCapabilities.value.filter(
+      (value) => value !== capability
+    )
+    if (!openAITextGenerationCapabilityEnabled.value) {
+      openAIResponsesMode.value = 'auto'
+    }
+    return
+  }
+  openAIEndpointCapabilities.value = normalizeOpenAIEndpointCapabilities([
+    ...openAIEndpointCapabilities.value,
+    capability
+  ])
+}
+
+const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) => {
+  const capabilities = normalizeOpenAIEndpointCapabilities(openAIEndpointCapabilities.value)
+  if (capabilities.length === 2) {
+    delete credentials.openai_capabilities
+    return
+  }
+  credentials.openai_capabilities = capabilities
+}
 
 function buildAntigravityExtra(): Record<string, unknown> | undefined {
   const extra: Record<string, unknown> = {}
@@ -3872,6 +4030,7 @@ watch(
     }
     if (newPlatform !== 'openai') {
       openaiPassthroughEnabled.value = false
+      openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
       openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       codexCLIOnlyEnabled.value = false
@@ -4264,6 +4423,7 @@ const resetForm = () => {
   })
   poolModeEnabled.value = false
   poolModeRetryCount.value = DEFAULT_POOL_MODE_RETRY_COUNT
+  poolModeRetryStatusCodesInput.value = ''
   customErrorCodesEnabled.value = false
   selectedErrorCodes.value = []
   customErrorCodeInput.value = null
@@ -4272,6 +4432,8 @@ const resetForm = () => {
   stripReasoningEffortOnCC.value = false
   openaiPassthroughEnabled.value = false
   openAICompactMode.value = 'auto'
+  openAIResponsesMode.value = 'auto'
+  openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
   openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   codexCLIOnlyEnabled.value = false
@@ -4357,6 +4519,16 @@ const buildOpenAIExtra = (base?: Record<string, unknown>): Record<string, unknow
     extra.openai_compact_mode = openAICompactMode.value
   } else {
     delete extra.openai_compact_mode
+  }
+
+  if (
+    accountCategory.value === 'apikey' &&
+    openAITextGenerationCapabilityEnabled.value &&
+    openAIResponsesMode.value !== 'auto'
+  ) {
+    extra.openai_responses_mode = openAIResponsesMode.value
+  } else {
+    delete extra.openai_responses_mode
   }
 
   return Object.keys(extra).length > 0 ? extra : undefined
@@ -4540,6 +4712,10 @@ const handleSubmit = async () => {
     if (poolModeEnabled.value) {
       credentials.pool_mode = true
       credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
+      const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)
+      if (parsedRetryStatusCodes.length > 0) {
+        credentials.pool_mode_retry_status_codes = parsedRetryStatusCodes
+      }
     }
 
     applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
@@ -4660,6 +4836,7 @@ const handleSubmit = async () => {
     }
   }
   if (form.platform === 'openai') {
+    applyOpenAIEndpointCapabilities(credentials)
     const compactModelMapping = buildOpenAICompactModelMapping()
     if (compactModelMapping) {
       credentials.compact_model_mapping = compactModelMapping
@@ -4670,6 +4847,10 @@ const handleSubmit = async () => {
   if (poolModeEnabled.value) {
     credentials.pool_mode = true
     credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
+    const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)
+    if (parsedRetryStatusCodes.length > 0) {
+      credentials.pool_mode_retry_status_codes = parsedRetryStatusCodes
+    }
   }
 
   // Add custom error codes if enabled
@@ -4778,6 +4959,9 @@ const createAccountAndFinish = async (
     }
   }
   if (platform === 'openai') {
+    if (type === 'apikey') {
+      applyOpenAIEndpointCapabilities(credentials)
+    }
     const compactModelMapping = buildOpenAICompactModelMapping()
     if (compactModelMapping) {
       credentials.compact_model_mapping = compactModelMapping
