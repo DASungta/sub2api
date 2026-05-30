@@ -48,19 +48,19 @@ type DataProxy struct {
 // Credentials 原文返回。这是"管理员备份"这一显式行为的一部分；如未来需要导出脱敏版本，
 // 应新增独立结构而非修改这里。
 type DataAccount struct {
-	Name               string         `json:"name"`
-	Notes              *string        `json:"notes,omitempty"`
-	Platform           string         `json:"platform"`
-	Type               string         `json:"type"`
-	Credentials        map[string]any `json:"credentials"`
-	Extra              map[string]any `json:"extra,omitempty"`
-	ProxyKey           *string        `json:"proxy_key,omitempty"`
-	Concurrency        int            `json:"concurrency"`
-	Priority           int            `json:"priority"`
-	RateMultiplier     *float64       `json:"rate_multiplier,omitempty"`
-	ExpiresAt               *int64 `json:"expires_at,omitempty"`
-	AutoPauseOnExpired      *bool  `json:"auto_pause_on_expired,omitempty"`
-	StripReasoningEffortOnCC *bool `json:"strip_reasoning_effort_on_cc,omitempty"`
+	Name                     string         `json:"name"`
+	Notes                    *string        `json:"notes,omitempty"`
+	Platform                 string         `json:"platform"`
+	Type                     string         `json:"type"`
+	Credentials              map[string]any `json:"credentials"`
+	Extra                    map[string]any `json:"extra,omitempty"`
+	ProxyKey                 *string        `json:"proxy_key,omitempty"`
+	Concurrency              int            `json:"concurrency"`
+	Priority                 int            `json:"priority"`
+	RateMultiplier           *float64       `json:"rate_multiplier,omitempty"`
+	ExpiresAt                *int64         `json:"expires_at,omitempty"`
+	AutoPauseOnExpired       *bool          `json:"auto_pause_on_expired,omitempty"`
+	StripReasoningEffortOnCC *bool          `json:"strip_reasoning_effort_on_cc,omitempty"`
 }
 
 type DataImportRequest struct {
@@ -153,16 +153,16 @@ func (h *AccountHandler) ExportData(c *gin.Context) {
 			expiresAt = &v
 		}
 		dataAccounts = append(dataAccounts, DataAccount{
-			Name:               acc.Name,
-			Notes:              acc.Notes,
-			Platform:           acc.Platform,
-			Type:               acc.Type,
-			Credentials:        acc.Credentials,
-			Extra:              acc.Extra,
-			ProxyKey:           proxyKey,
-			Concurrency:        acc.Concurrency,
-			Priority:           acc.Priority,
-			RateMultiplier:     acc.RateMultiplier,
+			Name:                     acc.Name,
+			Notes:                    acc.Notes,
+			Platform:                 acc.Platform,
+			Type:                     acc.Type,
+			Credentials:              acc.Credentials,
+			Extra:                    acc.Extra,
+			ProxyKey:                 proxyKey,
+			Concurrency:              acc.Concurrency,
+			Priority:                 acc.Priority,
+			RateMultiplier:           acc.RateMultiplier,
 			ExpiresAt:                expiresAt,
 			AutoPauseOnExpired:       &acc.AutoPauseOnExpired,
 			StripReasoningEffortOnCC: &acc.StripReasoningEffortOnCC,
@@ -308,17 +308,17 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		enrichCredentialsFromIDToken(&item)
 
 		accountInput := &service.CreateAccountInput{
-			Name:                 item.Name,
-			Notes:                item.Notes,
-			Platform:             item.Platform,
-			Type:                 item.Type,
-			Credentials:          item.Credentials,
-			Extra:                item.Extra,
-			ProxyID:              proxyID,
-			Concurrency:          item.Concurrency,
-			Priority:             item.Priority,
-			RateMultiplier:       item.RateMultiplier,
-			GroupIDs:             nil,
+			Name:                     item.Name,
+			Notes:                    item.Notes,
+			Platform:                 item.Platform,
+			Type:                     item.Type,
+			Credentials:              item.Credentials,
+			Extra:                    item.Extra,
+			ProxyID:                  proxyID,
+			Concurrency:              item.Concurrency,
+			Priority:                 item.Priority,
+			RateMultiplier:           item.RateMultiplier,
+			GroupIDs:                 nil,
 			ExpiresAt:                item.ExpiresAt,
 			AutoPauseOnExpired:       item.AutoPauseOnExpired,
 			StripReasoningEffortOnCC: item.StripReasoningEffortOnCC,
@@ -618,6 +618,23 @@ func validateAPIKeyChatCompletionsCredentials(creds map[string]any) error {
 		return errors.New("api_key is required for apikey-chat-completions accounts")
 	}
 
+	return validateOpenAICompatibleAuthHeaderCredential(creds)
+}
+
+func validateAPIKeyChatCompletionsCredentialsUpdate(creds map[string]any) error {
+	if creds == nil {
+		return nil
+	}
+	return validateOpenAICompatibleAuthHeaderCredential(creds)
+}
+
+func validateOpenAICompatibleAuthHeaderCredential(creds map[string]any) error {
+	if rawAuthHeader, ok := creds["auth_header"]; ok {
+		authHeader, _ := rawAuthHeader.(string)
+		if _, valid := service.NormalizeOpenAICompatibleAuthHeader(authHeader); !valid {
+			return fmt.Errorf("auth_header must be one of %q, %q, or %q", service.OpenAICompatibleAuthHeaderAuthorization, service.OpenAICompatibleAuthHeaderAPIKey, service.OpenAICompatibleAuthHeaderXAPIKey)
+		}
+	}
 	return nil
 }
 

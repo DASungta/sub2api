@@ -196,11 +196,11 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		if ccURL == "" {
 			return s.sendErrorAndEnd(c, "No chat_completions_url configured for this account")
 		}
-		normalizedBaseURL, err := s.validateUpstreamBaseURL(ccURL)
+		chatCompletionsURL, err := s.validateUpstreamBaseURL(ccURL)
 		if err != nil {
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid chat_completions_url: %s", err.Error()))
 		}
-		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, chatCompletionsURL, authToken)
 	}
 
 	// Route to platform-specific test method
@@ -544,11 +544,11 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		if ccURL == "" {
 			return s.sendErrorAndEnd(c, "No chat_completions_url configured for this account")
 		}
-		normalizedBaseURL, err := s.validateUpstreamBaseURL(ccURL)
+		chatCompletionsURL, err := s.validateUpstreamBaseURL(ccURL)
 		if err != nil {
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid chat_completions_url: %s", err.Error()))
 		}
-		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, chatCompletionsURL, authToken)
 	}
 
 	// Route to image generation test if an image model is selected
@@ -596,7 +596,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
-			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, buildOpenAIChatCompletionsURL(normalizedBaseURL), authToken)
 		}
 		apiURL = buildOpenAIResponsesURL(normalizedBaseURL)
 	} else {
@@ -679,11 +679,11 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	account *Account,
 	testModelID string,
 	prompt string,
-	normalizedBaseURL string,
+	chatCompletionsURL string,
 	authToken string,
 ) error {
 	ctx := c.Request.Context()
-	apiURL := buildOpenAIChatCompletionsURL(normalizedBaseURL)
+	apiURL := strings.TrimSpace(chatCompletionsURL)
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -704,7 +704,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Authorization", "Bearer "+authToken)
+	applyOpenAICompatibleAPIKeyAuth(req, account, authToken)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {

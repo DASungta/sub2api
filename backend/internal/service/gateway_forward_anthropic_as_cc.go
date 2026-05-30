@@ -129,7 +129,7 @@ func (s *GatewayService) ForwardAnthropicAsChatCompletions(
 	}
 	upstreamReq.Header.Set("Content-Type", "application/json")
 	upstreamReq.Header.Set("Accept", "text/event-stream")
-	upstreamReq.Header.Set("Authorization", "Bearer "+apiKey)
+	applyOpenAICompatibleAPIKeyAuth(upstreamReq, account, apiKey)
 	if c != nil && c.Request != nil {
 		for key, values := range c.Request.Header {
 			if anthropicAsCCAllowedHeaders[strings.ToLower(key)] {

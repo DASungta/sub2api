@@ -605,6 +605,15 @@
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.types.chatCompletionsAuthHeader') }}</label>
+          <select v-model="editChatCompletionsAuthHeader" class="input">
+            <option value="Authorization">Authorization: Bearer &lt;API Key&gt;</option>
+            <option value="api-key">api-key: &lt;API Key&gt;</option>
+            <option value="x-api-key">x-api-key: &lt;API Key&gt;</option>
+          </select>
+          <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsAuthHeaderHint') }}</p>
+        </div>
 
         <!-- Model Restriction Section -->
         <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -2532,11 +2541,19 @@ interface TempUnschedRuleForm {
   description: string
 }
 
+type ChatCompletionsAuthHeader = 'Authorization' | 'api-key' | 'x-api-key'
+
+const normalizeChatCompletionsAuthHeader = (value: unknown): ChatCompletionsAuthHeader => {
+  if (value === 'api-key' || value === 'x-api-key' || value === 'Authorization') return value
+  return 'Authorization'
+}
+
 // State
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editChatCompletionsUrl = ref('')
+const editChatCompletionsAuthHeader = ref<ChatCompletionsAuthHeader>('Authorization')
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
 const editBedrockSecretAccessKey = ref('')
@@ -3188,6 +3205,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   } else if (newAccount.type === 'apikey-chat-completions' && newAccount.credentials) {
     const ccCreds = newAccount.credentials as Record<string, unknown>
     editChatCompletionsUrl.value = (ccCreds.chat_completions_url as string) || ''
+    editChatCompletionsAuthHeader.value = normalizeChatCompletionsAuthHeader(ccCreds.auth_header)
     editApiKey.value = ''
 
     // Load model mappings and detect mode
@@ -3863,6 +3881,7 @@ const handleSubmit = async () => {
         return
       }
       newCredentials.chat_completions_url = editChatCompletionsUrl.value.trim()
+      newCredentials.auth_header = editChatCompletionsAuthHeader.value
 
       if (editApiKey.value.trim()) {
         newCredentials.api_key = editApiKey.value.trim()

@@ -41,6 +41,55 @@ func responsesToCCTestConfig() *config.Config {
 	}
 }
 
+func TestForward_APIKeyChatCompletionsResponsesUsesAdapter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstreamResp := `{
+		"id":"chatcmpl_rcc_forward",
+		"object":"chat.completion",
+		"created":1,
+		"model":"gpt-5.4",
+		"choices":[{"index":0,"message":{"role":"assistant","content":"hello from cc"},"finish_reason":"stop"}],
+		"usage":{"prompt_tokens":6,"completion_tokens":3,"total_tokens":9}
+	}`
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid_rcc_forward"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamResp)),
+	}}
+
+	body := []byte(`{"model":"gpt-5.4","input":"hi","stream":false}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	svc := &OpenAIGatewayService{
+		cfg:          responsesToCCTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := responsesToCCTestAccount("http://upstream.example/v1/chat/completions")
+
+	result, err := svc.Forward(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.False(t, result.Stream)
+	require.Equal(t, "gpt-5.4", result.Model)
+	require.Equal(t, 6, result.Usage.InputTokens)
+	require.Equal(t, 3, result.Usage.OutputTokens)
+
+	require.NotNil(t, upstream.lastReq)
+	require.Equal(t, "http://upstream.example/v1/chat/completions", upstream.lastReq.URL.String())
+	require.Equal(t, "Bearer sk-test-rcc", upstream.lastReq.Header.Get("Authorization"))
+	require.Contains(t, string(upstream.lastBody), `"messages"`)
+	require.NotContains(t, string(upstream.lastBody), `"input":"hi"`)
+
+	clientBody := rec.Body.String()
+	require.Contains(t, clientBody, `"object":"response"`)
+	require.Contains(t, clientBody, "hello from cc")
+}
+
 func TestForwardResponsesAsChatCompletions_NonStreamingTextResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

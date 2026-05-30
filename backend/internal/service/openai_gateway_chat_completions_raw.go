@@ -150,7 +150,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	upstreamReq = upstreamReq.WithContext(WithHTTPUpstreamProfile(upstreamReq.Context(), HTTPUpstreamProfileOpenAI))
 	upstreamReq.Header.Set("Content-Type", "application/json")
-	upstreamReq.Header.Set("Authorization", "Bearer "+apiKey)
+	applyOpenAICompatibleAPIKeyAuth(upstreamReq, account, apiKey)
 	if clientStream {
 		upstreamReq.Header.Set("Accept", "text/event-stream")
 	} else {
