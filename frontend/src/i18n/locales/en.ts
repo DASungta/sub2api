@@ -3073,7 +3073,10 @@ export default {
         chatCompletionsUrlHint: 'Full /v1/chat/completions endpoint URL of the upstream service',
         chatCompletionsApiKey: 'API Key',
         chatCompletionsApiKeyPlaceholder: 'API Key for the upstream service',
-        chatCompletionsApiKeyHint: 'Bearer token used to authenticate against the upstream'
+        chatCompletionsApiKeyHint: 'API Key used to authenticate against the upstream',
+        chatCompletionsAuthHeader: 'Auth Header',
+        chatCompletionsAuthHeaderHint:
+          'Select the API Key header required by the upstream. Most OpenAI-compatible APIs use Authorization: Bearer; some use api-key or x-api-key.'
       },
       status: {
         active: 'Active',

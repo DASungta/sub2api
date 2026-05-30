@@ -1091,6 +1091,15 @@
           />
           <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsApiKeyHint') }}</p>
         </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.types.chatCompletionsAuthHeader') }}</label>
+          <select v-model="chatCompletionsAuthHeader" class="input">
+            <option value="Authorization">Authorization: Bearer &lt;API Key&gt;</option>
+            <option value="api-key">api-key: &lt;API Key&gt;</option>
+            <option value="x-api-key">x-api-key: &lt;API Key&gt;</option>
+          </select>
+          <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsAuthHeaderHint') }}</p>
+        </div>
 
         <!-- Model Restriction Section -->
         <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -3576,9 +3585,12 @@ interface TempUnschedRuleForm {
 // State
 const step = ref(1)
 const submitting = ref(false)
+type ChatCompletionsAuthHeader = 'Authorization' | 'api-key' | 'x-api-key'
+
 const accountCategory = ref<'oauth-based' | 'apikey' | 'apikey-chat-completions' | 'bedrock' | 'service_account'>('oauth-based') // UI selection for account category
 const chatCompletionsUrl = ref('')
 const chatCompletionsApiKey = ref('')
+const chatCompletionsAuthHeader = ref<ChatCompletionsAuthHeader>('Authorization')
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
@@ -4431,6 +4443,7 @@ const resetForm = () => {
   apiKeyValue.value = ''
   chatCompletionsUrl.value = ''
   chatCompletionsApiKey.value = ''
+  chatCompletionsAuthHeader.value = 'Authorization'
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -4836,7 +4849,8 @@ const handleSubmit = async () => {
     }
     const credentials: Record<string, unknown> = {
       chat_completions_url: chatCompletionsUrl.value.trim(),
-      api_key: chatCompletionsApiKey.value.trim()
+      api_key: chatCompletionsApiKey.value.trim(),
+      auth_header: chatCompletionsAuthHeader.value
     }
     const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
     if (modelMapping) credentials.model_mapping = modelMapping

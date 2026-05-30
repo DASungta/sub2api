@@ -1171,7 +1171,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	})
 	if err != nil {
 		reqLog.Warn("openai.websocket_accept_failed",
-			zap.Error(proxyErr),
+			zap.Error(err),
 			zap.String("client_ip", clientIP),
 			zap.String("request_user_agent", userAgent),
 			zap.String("upgrade_header", strings.TrimSpace(c.GetHeader("Upgrade"))),
@@ -1191,7 +1191,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	msgType, firstMessage, err := wsConn.Read(readCtx)
 	cancel()
 	if err != nil {
-		closeStatus, closeReason := summarizeWSCloseErrorForLog(proxyErr)
+		closeStatus, closeReason := summarizeWSCloseErrorForLog(err)
 		reqLog.Warn("openai.websocket_read_first_message_failed",
 			zap.Error(err),
 			zap.String("client_ip", clientIP),

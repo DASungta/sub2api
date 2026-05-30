@@ -66,6 +66,7 @@ func newAnthropicCCGatewayService(t *testing.T, httpUp service.HTTPUpstream) *se
 		nil, // channelService
 		nil, // resolver
 		nil, // balanceNotifyService
+		nil, // userPlatformQuotaRepo
 	)
 }
 

@@ -3259,7 +3259,10 @@ export default {
         chatCompletionsUrlHint: '上游服务的 /v1/chat/completions 完整端点 URL',
         chatCompletionsApiKey: 'API Key',
         chatCompletionsApiKeyPlaceholder: '上游服务的 API Key',
-        chatCompletionsApiKeyHint: '用于鉴权上游服务的 Bearer Token',
+        chatCompletionsApiKeyHint: '用于鉴权上游服务的 API Key',
+        chatCompletionsAuthHeader: '鉴权 Header',
+        chatCompletionsAuthHeaderHint:
+          '选择上游接口要求的 API Key Header。多数 OpenAI 兼容接口使用 Authorization: Bearer；部分接口使用 api-key 或 x-api-key。',
         api_key: 'API Key',
         cookie: 'Cookie'
       },

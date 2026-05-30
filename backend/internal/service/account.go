@@ -29,16 +29,16 @@ type Account struct {
 	Priority    int
 	// RateMultiplier 账号计费倍率（>=0，允许 0 表示该账号计费为 0）。
 	// 使用指针用于兼容旧版本调度缓存（Redis）中缺字段的情况：nil 表示按 1.0 处理。
-	RateMultiplier     *float64
-	LoadFactor         *int // 调度负载因子；nil 表示使用 Concurrency
-	Status             string
-	ErrorMessage       string
-	LastUsedAt         *time.Time
-	ExpiresAt          *time.Time
-	AutoPauseOnExpired      bool
+	RateMultiplier           *float64
+	LoadFactor               *int // 调度负载因子；nil 表示使用 Concurrency
+	Status                   string
+	ErrorMessage             string
+	LastUsedAt               *time.Time
+	ExpiresAt                *time.Time
+	AutoPauseOnExpired       bool
 	StripReasoningEffortOnCC bool
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 
 	Schedulable bool
 
@@ -1102,6 +1102,41 @@ func (a *Account) GetUpstreamAPIKey() string {
 		}
 	}
 	return ""
+}
+
+const (
+	OpenAICompatibleAuthHeaderAuthorization = "Authorization"
+	OpenAICompatibleAuthHeaderAPIKey        = "api-key"
+	OpenAICompatibleAuthHeaderXAPIKey       = "x-api-key"
+)
+
+func NormalizeOpenAICompatibleAuthHeader(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return OpenAICompatibleAuthHeaderAuthorization, true
+	case strings.ToLower(OpenAICompatibleAuthHeaderAuthorization):
+		return OpenAICompatibleAuthHeaderAuthorization, true
+	case OpenAICompatibleAuthHeaderAPIKey:
+		return OpenAICompatibleAuthHeaderAPIKey, true
+	case OpenAICompatibleAuthHeaderXAPIKey:
+		return OpenAICompatibleAuthHeaderXAPIKey, true
+	default:
+		return "", false
+	}
+}
+
+func (a *Account) OpenAICompatibleAuthHeader() string {
+	if a == nil || a.Credentials == nil || !a.IsOpenAIChatCompletionsUpstream() {
+		return OpenAICompatibleAuthHeaderAuthorization
+	}
+	if v, ok := a.Credentials["auth_header"]; ok {
+		if s, ok := v.(string); ok {
+			if header, valid := NormalizeOpenAICompatibleAuthHeader(s); valid {
+				return header
+			}
+		}
+	}
+	return OpenAICompatibleAuthHeaderAuthorization
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
