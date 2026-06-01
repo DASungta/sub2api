@@ -207,6 +207,7 @@ func (s *GatewayService) ForwardAnthropicAsChatCompletions(
 	}
 
 	// 9. Forward response
+	logUpstreamTraceID(ctx, account, resp.Header, originalModel)
 	if clientStream {
 		return s.streamAnthropicFromCC(c, resp, originalModel, mappedModel, startTime)
 	}

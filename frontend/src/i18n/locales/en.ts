@@ -3076,7 +3076,11 @@ export default {
         chatCompletionsApiKeyHint: 'API Key used to authenticate against the upstream',
         chatCompletionsAuthHeader: 'Auth Header',
         chatCompletionsAuthHeaderHint:
-          'Select the API Key header required by the upstream. Most OpenAI-compatible APIs use Authorization: Bearer; some use api-key or x-api-key.'
+          'Select the API Key header required by the upstream. Most OpenAI-compatible APIs use Authorization: Bearer; some use api-key or x-api-key.',
+        chatCompletionsTraceIdHeader: 'Trace ID Header',
+        chatCompletionsTraceIdHeaderPlaceholder: 'e.g. st-gateway-request-id',
+        chatCompletionsTraceIdHeaderHint:
+          'Optional. When set, the gateway reads this response header from the upstream and logs its value alongside the local request ID, making it easier to correlate upstream traces during troubleshooting. Leave empty to disable.'
       },
       status: {
         active: 'Active',

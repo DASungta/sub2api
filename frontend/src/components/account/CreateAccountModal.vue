@@ -1100,6 +1100,16 @@
           </select>
           <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsAuthHeaderHint') }}</p>
         </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.types.chatCompletionsTraceIdHeader') }}</label>
+          <input
+            v-model="chatCompletionsTraceIdHeader"
+            type="text"
+            class="input"
+            :placeholder="t('admin.accounts.types.chatCompletionsTraceIdHeaderPlaceholder')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsTraceIdHeaderHint') }}</p>
+        </div>
 
         <!-- Model Restriction Section -->
         <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -3591,6 +3601,7 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'apikey-chat-completions'
 const chatCompletionsUrl = ref('')
 const chatCompletionsApiKey = ref('')
 const chatCompletionsAuthHeader = ref<ChatCompletionsAuthHeader>('Authorization')
+const chatCompletionsTraceIdHeader = ref('')
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
@@ -4455,6 +4466,7 @@ const resetForm = () => {
   chatCompletionsUrl.value = ''
   chatCompletionsApiKey.value = ''
   chatCompletionsAuthHeader.value = 'Authorization'
+  chatCompletionsTraceIdHeader.value = ''
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -4862,6 +4874,9 @@ const handleSubmit = async () => {
       chat_completions_url: chatCompletionsUrl.value.trim(),
       api_key: chatCompletionsApiKey.value.trim(),
       auth_header: chatCompletionsAuthHeader.value
+    }
+    if (chatCompletionsTraceIdHeader.value.trim()) {
+      credentials.trace_id_header = chatCompletionsTraceIdHeader.value.trim()
     }
     const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
     if (modelMapping) credentials.model_mapping = modelMapping

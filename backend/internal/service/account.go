@@ -1139,6 +1139,19 @@ func (a *Account) OpenAICompatibleAuthHeader() string {
 	return OpenAICompatibleAuthHeaderAuthorization
 }
 
+// GetChatCompletionsTraceIDHeader 返回 apikey-chat-completions 账号配置的、
+// 用于从上游响应头提取 trace_id 的 header 名（如 "st-gateway-request-id"）。
+// 未配置或非 apikey-chat-completions 类型时返回 ""。
+func (a *Account) GetChatCompletionsTraceIDHeader() string {
+	if a == nil || a.Credentials == nil || !a.IsOpenAIChatCompletionsUpstream() {
+		return ""
+	}
+	if v, ok := a.Credentials["trace_id_header"].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
 func (a *Account) GetOpenAIBaseURL() string {
 	if !a.IsOpenAI() {
 		return ""

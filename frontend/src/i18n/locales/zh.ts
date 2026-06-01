@@ -3264,6 +3264,10 @@ export default {
         chatCompletionsAuthHeader: '鉴权 Header',
         chatCompletionsAuthHeaderHint:
           '选择上游接口要求的 API Key Header。多数 OpenAI 兼容接口使用 Authorization: Bearer；部分接口使用 api-key 或 x-api-key。',
+        chatCompletionsTraceIdHeader: 'Trace ID Header',
+        chatCompletionsTraceIdHeaderPlaceholder: '如 st-gateway-request-id',
+        chatCompletionsTraceIdHeaderHint:
+          '可选。填写后，网关会从上游响应头中读取该字段的值，并连同本地请求 ID 一起写入日志，便于排查问题时关联上游链路。留空则不记录。',
         api_key: 'API Key',
         cookie: 'Cookie'
       },

@@ -183,6 +183,7 @@ func (s *GatewayService) ForwardAsChatCompletions(
 
 	// 14. Handle normal response
 	// Read Anthropic SSE → convert to Responses events → convert to CC format
+	logUpstreamTraceID(ctx, account, resp.Header, originalModel)
 	var result *ForwardResult
 	var handleErr error
 	if clientStream {

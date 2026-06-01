@@ -180,6 +180,7 @@ func (s *GatewayService) ForwardClaudeChatCompletionsRaw(
 	}
 
 	// 8. Forward response.
+	logUpstreamTraceID(ctx, account, resp.Header, originalModel)
 	if clientStream {
 		return s.streamClaudeRawChatCompletions(c, resp, originalModel, mappedModel, startTime)
 	}

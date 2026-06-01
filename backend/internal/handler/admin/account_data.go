@@ -635,7 +635,34 @@ func validateOpenAICompatibleAuthHeaderCredential(creds map[string]any) error {
 			return fmt.Errorf("auth_header must be one of %q, %q, or %q", service.OpenAICompatibleAuthHeaderAuthorization, service.OpenAICompatibleAuthHeaderAPIKey, service.OpenAICompatibleAuthHeaderXAPIKey)
 		}
 	}
+	if rawTraceHeader, ok := creds["trace_id_header"]; ok {
+		traceHeader, _ := rawTraceHeader.(string)
+		traceHeader = strings.TrimSpace(traceHeader)
+		if traceHeader != "" && !isValidHTTPHeaderName(traceHeader) {
+			return errors.New("trace_id_header must be a valid HTTP header field-name (no whitespace or control characters)")
+		}
+	}
 	return nil
+}
+
+// isValidHTTPHeaderName reports whether s is a valid HTTP/1.1 header field-name
+// per RFC 7230 §3.2: token = 1*tchar, where tchar excludes whitespace, "(),"/:;<=>?@[\]{}.
+func isValidHTTPHeaderName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		// tchar: printable ASCII except delimiters
+		if c <= 0x20 || c >= 0x7F {
+			return false
+		}
+		switch c {
+		case '(', ')', ',', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '{', '}':
+			return false
+		}
+	}
+	return true
 }
 
 func defaultProxyName(name string) string {

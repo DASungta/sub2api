@@ -219,6 +219,7 @@ func (s *OpenAIGatewayService) ForwardResponsesAsChatCompletions(
 	}
 
 	// 9. Forward response
+	logUpstreamTraceID(ctx, account, resp.Header, originalModel)
 	if clientStream {
 		return s.streamResponsesFromCC(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}

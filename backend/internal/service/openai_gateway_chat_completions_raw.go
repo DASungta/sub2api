@@ -231,6 +231,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 
 	// 8. Forward response
+	logUpstreamTraceID(ctx, account, resp.Header, originalModel)
 	if clientStream {
 		return s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, len(body))
 	}

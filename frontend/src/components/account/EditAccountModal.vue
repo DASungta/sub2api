@@ -614,6 +614,16 @@
           </select>
           <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsAuthHeaderHint') }}</p>
         </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.types.chatCompletionsTraceIdHeader') }}</label>
+          <input
+            v-model="editChatCompletionsTraceIdHeader"
+            type="text"
+            class="input"
+            :placeholder="t('admin.accounts.types.chatCompletionsTraceIdHeaderPlaceholder')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.types.chatCompletionsTraceIdHeaderHint') }}</p>
+        </div>
 
         <!-- Model Restriction Section -->
         <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -2632,6 +2642,7 @@ const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editChatCompletionsUrl = ref('')
 const editChatCompletionsAuthHeader = ref<ChatCompletionsAuthHeader>('Authorization')
+const editChatCompletionsTraceIdHeader = ref('')
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
 const editBedrockSecretAccessKey = ref('')
@@ -3292,6 +3303,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     const ccCreds = newAccount.credentials as Record<string, unknown>
     editChatCompletionsUrl.value = (ccCreds.chat_completions_url as string) || ''
     editChatCompletionsAuthHeader.value = normalizeChatCompletionsAuthHeader(ccCreds.auth_header)
+    editChatCompletionsTraceIdHeader.value = (ccCreds.trace_id_header as string) || ''
     editApiKey.value = ''
 
     // Load model mappings and detect mode
@@ -3968,6 +3980,11 @@ const handleSubmit = async () => {
       }
       newCredentials.chat_completions_url = editChatCompletionsUrl.value.trim()
       newCredentials.auth_header = editChatCompletionsAuthHeader.value
+      if (editChatCompletionsTraceIdHeader.value.trim()) {
+        newCredentials.trace_id_header = editChatCompletionsTraceIdHeader.value.trim()
+      } else {
+        delete newCredentials.trace_id_header
+      }
 
       if (editApiKey.value.trim()) {
         newCredentials.api_key = editApiKey.value.trim()
