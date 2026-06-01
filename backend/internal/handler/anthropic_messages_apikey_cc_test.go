@@ -106,7 +106,7 @@ func TestAPIKeyCCMessages_NonStream(t *testing.T) {
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Request.Header.Set("anthropic-beta", "tools-2024-05-16")
 
-	parsed := &service.ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &service.ParsedRequest{Body: service.NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	result, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -156,7 +156,7 @@ func TestAPIKeyCCMessages_Stream(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
-	parsed := &service.ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: true}
+	parsed := &service.ParsedRequest{Body: service.NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: true}
 	result, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -190,7 +190,7 @@ func TestAPIKeyCCMessages_UpstreamError(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 
-	parsed := &service.ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &service.ParsedRequest{Body: service.NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	_, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.Error(t, err)
 
@@ -234,7 +234,7 @@ func TestAPIKeyCCChatCompletions_ClaudePlatform(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
-	result, err := svc.ForwardClaudeChatCompletionsRaw(c.Request.Context(), c, account, body, &service.ParsedRequest{Body: body})
+	result, err := svc.ForwardClaudeChatCompletionsRaw(c.Request.Context(), c, account, body, &service.ParsedRequest{Body: service.NewRequestBodyRef(body)})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.Stream)

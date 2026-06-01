@@ -52,7 +52,7 @@ func (s *GatewayService) ForwardAnthropicAsChatCompletions(
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty parsed request")
 	}
-	body := parsed.Body
+	body := parsed.Body.Bytes()
 
 	// 1. Parse Anthropic request
 	var anthropicReq apicompat.AnthropicRequest

@@ -52,7 +52,7 @@ func TestForwardClaudeChatCompletionsRaw_FailoverOn429(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "deepseek-chat", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "deepseek-chat", Stream: false}
 	_, err := svc.ForwardClaudeChatCompletionsRaw(c.Request.Context(), c, account, body, parsed)
 	require.Error(t, err)
 
@@ -86,7 +86,7 @@ func TestForwardClaudeChatCompletionsRaw_NoFailoverOn400(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "deepseek-chat", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "deepseek-chat", Stream: false}
 	_, err := svc.ForwardClaudeChatCompletionsRaw(c.Request.Context(), c, account, body, parsed)
 	require.Error(t, err)
 
@@ -121,7 +121,7 @@ func TestForwardClaudeChatCompletionsRaw_OnUpstreamAcceptedFires(t *testing.T) {
 
 	var acceptedCount int32
 	parsed := &ParsedRequest{
-		Body:   body,
+		Body:   NewRequestBodyRef(body),
 		Model:  "deepseek-chat",
 		Stream: false,
 		OnUpstreamAccepted: func() {

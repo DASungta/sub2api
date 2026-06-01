@@ -130,7 +130,7 @@ func TestForwardAnthropicAsChatCompletions_NonStream(t *testing.T) {
 	c.Request.Header.Set("anthropic-beta", "tools-2024-05-16")
 	c.Request.Header.Set("anthropic-version", "2023-06-01")
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	result, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -188,7 +188,7 @@ func TestForwardAnthropicAsChatCompletions_Stream(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: true}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: true}
 	result, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -235,7 +235,7 @@ func TestForwardAnthropicAsChatCompletions_ToolUse(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: true}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: true}
 	result, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -268,7 +268,7 @@ func TestForwardAnthropicAsChatCompletions_FailoverOn429(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	_, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.Error(t, err)
 
@@ -301,7 +301,7 @@ func TestForwardAnthropicAsChatCompletions_FailoverOn500(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	_, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 
 	var failoverErr *UpstreamFailoverError
@@ -331,7 +331,7 @@ func TestForwardAnthropicAsChatCompletions_NoFailoverOn400(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	_, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.Error(t, err)
 
@@ -378,7 +378,7 @@ func TestForwardAnthropicAsChatCompletions_OnUpstreamAcceptedFires(t *testing.T)
 
 	var acceptedCount int32
 	parsed := &ParsedRequest{
-		Body:   body,
+		Body:   NewRequestBodyRef(body),
 		Model:  "claude-sonnet-4",
 		Stream: false,
 		OnUpstreamAccepted: func() {
@@ -424,7 +424,7 @@ func TestForwardAnthropicAsChatCompletions_MissingURL(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4", Stream: false}
 	_, err := svc.ForwardAnthropicAsChatCompletions(c.Request.Context(), c, account, parsed)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "chat_completions_url")
