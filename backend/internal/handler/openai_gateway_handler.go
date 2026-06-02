@@ -1358,11 +1358,15 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			reqLog.Warn("openai.websocket_bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 		}
 
-		token, _, err := h.gatewayService.GetAccessToken(ctx, account)
-		if err != nil {
-			reqLog.Warn("openai.websocket_get_access_token_failed", zap.Int64("account_id", account.ID), zap.Error(err))
-			closeOpenAIClientWS(wsConn, coderws.StatusInternalError, "failed to get access token")
-			return
+		token := ""
+		if !account.IsOpenAIChatCompletionsUpstream() {
+			var err error
+			token, _, err = h.gatewayService.GetAccessToken(ctx, account)
+			if err != nil {
+				reqLog.Warn("openai.websocket_get_access_token_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				closeOpenAIClientWS(wsConn, coderws.StatusInternalError, "failed to get access token")
+				return
+			}
 		}
 
 		reqLog.Debug("openai.websocket_account_selected",
@@ -1447,6 +1451,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, result.FirstTokenMs)
 				inboundEndpoint := GetInboundEndpoint(c)
 				upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
+				if account.IsOpenAIChatCompletionsUpstream() {
+					upstreamEndpoint = "/v1/chat/completions"
+				}
 				h.submitOpenAIUsageRecordTask(ctx, result, func(taskCtx context.Context) {
 					if err := h.gatewayService.RecordUsage(taskCtx, &service.OpenAIRecordUsageInput{
 						Result:             result,
@@ -1481,9 +1488,15 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// WebSocket 首包可能很大，hash 必须在 hooks 外算成字符串，避免 AfterTurn 闭包保活请求体。
 		requestPayloadHash = service.HashUsageRequestPayload(wsFirstMessage)
 
-		if err := h.gatewayService.ProxyResponsesWebSocketFromClient(ctx, c, wsConn, account, token, wsFirstMessage, hooks); err != nil {
+		var proxyErr error
+		if account.IsOpenAIChatCompletionsUpstream() {
+			proxyErr = h.gatewayService.ProxyResponsesWebSocketAsChatCompletions(ctx, c, wsConn, account, wsFirstMessage, hooks)
+		} else {
+			proxyErr = h.gatewayService.ProxyResponsesWebSocketFromClient(ctx, c, wsConn, account, token, wsFirstMessage, hooks)
+		}
+		if proxyErr != nil {
 			var failoverErr *service.UpstreamFailoverError
-			if errors.As(err, &failoverErr) {
+			if errors.As(proxyErr, &failoverErr) {
 				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
 				releaseAccountSlot()
 				failedAccountIDs[account.ID] = struct{}{}
@@ -1519,7 +1532,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				zap.String("close_reason", closeReason),
 			)
 			var closeErr *service.OpenAIWSClientCloseError
-			if errors.As(err, &closeErr) {
+			if errors.As(proxyErr, &closeErr) {
 				closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
 				return
 			}
