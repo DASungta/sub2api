@@ -164,6 +164,8 @@ type Account struct {
 	CredentialsStatus        map[string]bool `json:"credentials_status,omitempty"`
 	Extra                    map[string]any  `json:"extra"`
 	ProxyID                  *int64          `json:"proxy_id"`
+	ProxyFallbackOriginID    *int64          `json:"proxy_fallback_origin_id"`
+	ProxyFallbackOriginName  *string         `json:"proxy_fallback_origin_name,omitempty"`
 	Concurrency              int             `json:"concurrency"`
 	LoadFactor               *int            `json:"load_factor,omitempty"`
 	Priority                 int             `json:"priority"`
@@ -280,6 +282,11 @@ type Proxy struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	ExpiresAt      *time.Time `json:"expires_at"`
+	FallbackMode   string     `json:"fallback_mode"`
+	BackupProxyID  *int64     `json:"backup_proxy_id"`
+	ExpiryWarnDays int        `json:"expiry_warn_days"`
 }
 
 type ProxyWithAccountCount struct {
@@ -466,6 +473,8 @@ type UsageLog struct {
 	ImageSize          *string        `json:"image_size"`
 	ImageInputSize     *string        `json:"image_input_size"`
 	ImageOutputSize    *string        `json:"image_output_size"`
+	ImageOutputTokens  int            `json:"image_output_tokens"`
+	ImageOutputCost    float64        `json:"image_output_cost"`
 	ImageSizeSource    *string        `json:"image_size_source"`
 	ImageSizeBreakdown map[string]int `json:"image_size_breakdown"`
 	MediaType          *string        `json:"media_type"`

@@ -105,6 +105,7 @@ var (
 		{Name: "type", Type: field.TypeString, Size: 40},
 		{Name: "credentials", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "extra", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "proxy_fallback_origin_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "concurrency", Type: field.TypeInt, Default: 3},
 		{Name: "load_factor", Type: field.TypeInt, Nullable: true},
 		{Name: "priority", Type: field.TypeInt, Default: 50},
@@ -153,7 +154,7 @@ var (
 			{
 				Name:    "account_status",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[14]},
+				Columns: []*schema.Column{AccountsColumns[15]},
 			},
 			{
 				Name:    "account_proxy_id",
@@ -163,12 +164,12 @@ var (
 			{
 				Name:    "account_priority",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[12]},
+				Columns: []*schema.Column{AccountsColumns[13]},
 			},
 			{
 				Name:    "account_last_used_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[16]},
+				Columns: []*schema.Column{AccountsColumns[17]},
 			},
 			{
 				Name:    "account_schedulable",
@@ -193,12 +194,12 @@ var (
 			{
 				Name:    "account_platform_priority",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[6], AccountsColumns[12]},
+				Columns: []*schema.Column{AccountsColumns[6], AccountsColumns[13]},
 			},
 			{
 				Name:    "account_priority_status",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[12], AccountsColumns[14]},
+				Columns: []*schema.Column{AccountsColumns[13], AccountsColumns[15]},
 			},
 			{
 				Name:    "account_deleted_at",
@@ -1105,12 +1106,24 @@ var (
 		{Name: "username", Type: field.TypeString, Nullable: true, Size: 100},
 		{Name: "password", Type: field.TypeString, Nullable: true, Size: 100},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "fallback_mode", Type: field.TypeString, Size: 20, Default: "none"},
+		{Name: "expiry_warn_days", Type: field.TypeInt, Default: 7},
+		{Name: "backup_proxy_id", Type: field.TypeInt64, Unique: true, Nullable: true},
 	}
 	// ProxiesTable holds the schema information for the "proxies" table.
 	ProxiesTable = &schema.Table{
 		Name:       "proxies",
 		Columns:    ProxiesColumns,
 		PrimaryKey: []*schema.Column{ProxiesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "proxies_proxies_backup_proxy",
+				Columns:    []*schema.Column{ProxiesColumns[14]},
+				RefColumns: []*schema.Column{ProxiesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "proxy_status",
@@ -1121,6 +1134,16 @@ var (
 				Name:    "proxy_deleted_at",
 				Unique:  false,
 				Columns: []*schema.Column{ProxiesColumns[3]},
+			},
+			{
+				Name:    "proxy_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[11]},
+			},
+			{
+				Name:    "proxy_backup_proxy_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[14]},
 			},
 		},
 	}
@@ -1872,6 +1895,7 @@ func init() {
 	PromoCodeUsagesTable.Annotation = &entsql.Annotation{
 		Table: "promo_code_usages",
 	}
+	ProxiesTable.ForeignKeys[0].RefTable = ProxiesTable
 	ProxiesTable.Annotation = &entsql.Annotation{
 		Table: "proxies",
 	}
