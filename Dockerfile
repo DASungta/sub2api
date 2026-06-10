@@ -29,6 +29,8 @@ RUN pnpm install --frozen-lockfile
 
 # Copy frontend source and build
 COPY frontend/ ./
+# Copy legal docs referenced by frontend via ?raw imports
+COPY docs/legal/ ../docs/legal/
 RUN pnpm run build
 
 # -----------------------------------------------------------------------------
