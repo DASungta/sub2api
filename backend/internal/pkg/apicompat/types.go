@@ -246,6 +246,9 @@ type ResponsesInputItem struct {
 
 	// type=function_call_output
 	Output string `json:"output,omitempty"`
+
+	// type=reasoning
+	Summary []ResponsesSummary `json:"summary,omitempty"`
 }
 
 // UnmarshalJSON accepts Responses function_call_output.output in both the

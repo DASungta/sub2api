@@ -223,7 +223,7 @@ func TestChatCompletionsToResponses_Stream_TextSequence(t *testing.T) {
 	// Text deltas
 	for _, txt := range []string{"Hello", ", ", "world"} {
 		chunk := `{"id":"chatcmpl-stream","object":"chat.completion.chunk","created":1,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":` + jsonString(txt) + `},"finish_reason":null}]}`
-		out, err = ConvertChatCompletionsSSEChunkToResponsesEvents(sseChunk(chunk), state)
+		_, err = ConvertChatCompletionsSSEChunkToResponsesEvents(sseChunk(chunk), state)
 		require.NoError(t, err)
 	}
 	// First text delta should also have produced response.output_item.added.

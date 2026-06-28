@@ -37,7 +37,7 @@ func chainCCToAnthropic(t *testing.T, lines []string) (string, []AnthropicStream
 				anthEvents = append(anthEvents, anth)
 				sse, err := ResponsesAnthropicEventToSSE(anth)
 				require.NoError(t, err)
-				sseOut.WriteString(sse)
+				_, _ = sseOut.WriteString(sse)
 			}
 		}
 	}
@@ -60,7 +60,7 @@ func chainCCToAnthropic(t *testing.T, lines []string) (string, []AnthropicStream
 		anthEvents = append(anthEvents, anth)
 		sse, err := ResponsesAnthropicEventToSSE(anth)
 		require.NoError(t, err)
-		sseOut.WriteString(sse)
+		_, _ = sseOut.WriteString(sse)
 	}
 	return sseOut.String(), anthEvents, ccState.Usage
 }

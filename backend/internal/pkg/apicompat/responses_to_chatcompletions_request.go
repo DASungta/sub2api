@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 )
 
 // ConvertResponsesOptions controls optional behaviour during Responses→ChatCompletions conversion.
@@ -144,10 +145,16 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 	out := make([]ChatMessage, 0, len(items))
 	// 多个 assistant function_call 在 Chat Completions 中需要合并到同一条
 	// assistant 消息的 tool_calls 数组里；用游标跟踪最后一条 assistant 消息。
-	var lastAssistantIdx int = -1
+	lastAssistantIdx := -1
+	var pendingReasoning string
 
 	for _, it := range items {
 		switch it.Type {
+		case "reasoning":
+			if reasoning := responsesInputReasoningText(it); reasoning != "" {
+				pendingReasoning = reasoning
+			}
+			continue
 		case "function_call":
 			tc := ChatToolCall{
 				ID:   it.CallID,
@@ -161,11 +168,16 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 				out[lastAssistantIdx].ToolCalls = append(out[lastAssistantIdx].ToolCalls, tc)
 			} else {
 				out = append(out, ChatMessage{
-					Role:      "assistant",
-					ToolCalls: []ChatToolCall{tc},
+					Role:             "assistant",
+					ToolCalls:        []ChatToolCall{tc},
+					ReasoningContent: pendingReasoning,
 				})
 				lastAssistantIdx = len(out) - 1
 			}
+			if out[lastAssistantIdx].ReasoningContent == "" {
+				out[lastAssistantIdx].ReasoningContent = pendingReasoning
+			}
+			pendingReasoning = ""
 		case "function_call_output":
 			content, err := json.Marshal(it.Output)
 			if err != nil {
@@ -177,6 +189,7 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 				Content:    content,
 			})
 			lastAssistantIdx = -1
+			pendingReasoning = ""
 		case "", "message":
 			role := it.Role
 			if role == "" {
@@ -196,6 +209,7 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 				lastAssistantIdx = len(out) - 1
 			} else {
 				lastAssistantIdx = -1
+				pendingReasoning = ""
 			}
 		default:
 			// 未识别 type 兜底为 user 文本，避免静默丢失。
@@ -207,6 +221,7 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 			}
 			out = append(out, ChatMessage{Role: "user", Content: content})
 			lastAssistantIdx = -1
+			pendingReasoning = ""
 		}
 	}
 
@@ -223,38 +238,41 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 // orphan tool messages are preserved as user-visible text instead of illegal
 // role=tool messages.
 func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage {
+	replies := make(map[string]ChatMessage)
+	for _, msg := range messages {
+		if msg.Role == "tool" && msg.ToolCallID != "" {
+			replies[msg.ToolCallID] = msg
+		}
+	}
+	pairedIDs := make(map[string]bool, len(replies))
+	for _, msg := range messages {
+		if msg.Role != "assistant" {
+			continue
+		}
+		for _, tc := range msg.ToolCalls {
+			if tc.ID != "" {
+				if _, ok := replies[tc.ID]; ok {
+					pairedIDs[tc.ID] = true
+				}
+			}
+		}
+	}
+
 	out := make([]ChatMessage, 0, len(messages))
 
-	for i := 0; i < len(messages); i++ {
-		msg := messages[i]
+	for _, msg := range messages {
 		if msg.Role == "tool" {
-			// Only degrade to a user message when there is no call_id — a tool
-			// message that carries a proper ToolCallID may appear at the start
-			// of a conversation history (e.g. a lone function_call_output from
-			// the Responses API) and should be forwarded as-is.
-			if msg.ToolCallID == "" {
+			if msg.ToolCallID != "" && pairedIDs[msg.ToolCallID] {
+				continue
+			}
+			if msg.ToolCallID == "" || !pairedIDs[msg.ToolCallID] {
 				out = append(out, orphanToolMessageAsUser(msg))
-			} else {
-				out = append(out, msg)
 			}
 			continue
 		}
 		if msg.Role != "assistant" || len(msg.ToolCalls) == 0 {
 			out = append(out, msg)
 			continue
-		}
-
-		j := i + 1
-		for j < len(messages) && messages[j].Role == "tool" {
-			j++
-		}
-		toolMessages := messages[i+1 : j]
-		matchingToolMessages := make(map[string][]ChatMessage, len(toolMessages))
-		for _, toolMsg := range toolMessages {
-			if toolMsg.ToolCallID == "" {
-				continue
-			}
-			matchingToolMessages[toolMsg.ToolCallID] = append(matchingToolMessages[toolMsg.ToolCallID], toolMsg)
 		}
 
 		validIDs := make(map[string]bool, len(msg.ToolCalls))
@@ -264,7 +282,7 @@ func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage
 				slog.Debug("apicompat: dropping assistant tool_call without id")
 				continue
 			}
-			if len(matchingToolMessages[tc.ID]) == 0 {
+			if _, ok := replies[tc.ID]; !ok {
 				slog.Debug("apicompat: dropping unanswered assistant tool_call",
 					slog.String("tool_call_id", tc.ID),
 					slog.String("name", tc.Function.Name))
@@ -282,17 +300,30 @@ func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage
 			out = append(out, msg)
 		}
 
-		for _, toolMsg := range toolMessages {
-			if validIDs[toolMsg.ToolCallID] {
-				out = append(out, toolMsg)
-			} else {
-				out = append(out, orphanToolMessageAsUser(toolMsg))
+		for _, tc := range validCalls {
+			if validIDs[tc.ID] {
+				out = append(out, replies[tc.ID])
 			}
 		}
-		i = j - 1
 	}
 
 	return out
+}
+
+func responsesInputReasoningText(item ResponsesInputItem) string {
+	if len(item.Summary) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(item.Summary))
+	for _, summary := range item.Summary {
+		if summary.Text != "" {
+			parts = append(parts, summary.Text)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, "\n")
 }
 
 func chatMessageHasNonEmptyContent(msg ChatMessage) bool {

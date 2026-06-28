@@ -162,7 +162,7 @@ func extractChatMessageText(raw json.RawMessage) string {
 		var b strings.Builder
 		for _, p := range parts {
 			if p.Type == "text" && p.Text != "" {
-				b.WriteString(p.Text)
+				_, _ = b.WriteString(p.Text)
 			}
 		}
 		return b.String()

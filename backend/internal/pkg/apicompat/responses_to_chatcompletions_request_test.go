@@ -406,14 +406,14 @@ func TestResponsesToChatCompletionsRequest_FunctionCallOutputObject(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got.Messages) != 1 || got.Messages[0].Role != "tool" {
-		t.Fatalf("expected single tool message, got %+v", got.Messages)
+	if len(got.Messages) != 1 || got.Messages[0].Role != "user" {
+		t.Fatalf("expected orphan tool output preserved as user message, got %+v", got.Messages)
 	}
 	var content string
 	if err := json.Unmarshal(got.Messages[0].Content, &content); err != nil {
 		t.Fatalf("unmarshal tool content: %v", err)
 	}
-	if content != `{"temp":68,"unit":"f"}` {
+	if content != `Tool result for call_1: {"temp":68,"unit":"f"}` {
 		t.Errorf("tool content: got %q", content)
 	}
 }

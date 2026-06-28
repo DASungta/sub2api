@@ -567,7 +567,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	var authToken string
 	var apiURL string
 	var isOAuth bool
-	var chatgptAccountID string
 
 	if account.IsOAuth() {
 		isOAuth = true
@@ -579,7 +578,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 		// OAuth uses ChatGPT internal API
 		apiURL = chatgptCodexAPIURL
-		chatgptAccountID = account.GetChatGPTAccountID()
 	} else if account.Type == "apikey" {
 		// API Key - use Platform API
 		authToken = account.GetOpenAIApiKey()
@@ -631,9 +629,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if isOAuth {
 		req.Host = "chatgpt.com"
 		req.Header.Set("accept", "text/event-stream")
-		if chatgptAccountID != "" {
-			req.Header.Set("chatgpt-account-id", chatgptAccountID)
-		}
+		setOpenAIChatGPTAccountHeaders(req.Header, account)
 	}
 
 	// Get proxy URL
@@ -740,7 +736,6 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 	authToken := ""
 	apiURL := ""
 	isOAuth := false
-	chatgptAccountID := ""
 
 	switch {
 	case account.IsOAuth():
@@ -750,7 +745,6 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, "No access token available")
 		}
 		apiURL = chatgptCodexAPIURL + "/compact"
-		chatgptAccountID = account.GetChatGPTAccountID()
 	case account.Type == AccountTypeAPIKey:
 		authToken = account.GetOpenAIApiKey()
 		if authToken == "" {
@@ -797,9 +791,7 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 
 	if isOAuth {
 		req.Host = "chatgpt.com"
-		if chatgptAccountID != "" {
-			req.Header.Set("chatgpt-account-id", chatgptAccountID)
-		}
+		setOpenAIChatGPTAccountHeaders(req.Header, account)
 	}
 
 	proxyURL := ""
@@ -1650,9 +1642,7 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	} else {
 		req.Header.Set("User-Agent", codexCLIUserAgent)
 	}
-	if chatgptAccountID := strings.TrimSpace(account.GetChatGPTAccountID()); chatgptAccountID != "" {
-		req.Header.Set("chatgpt-account-id", chatgptAccountID)
-	}
+	setOpenAIChatGPTAccountHeaders(req.Header, account)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -1703,77 +1693,6 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 
 	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 	return nil
-}
-
-// createOpenAICCTestPayload creates a Chat Completions format test payload.
-func createOpenAICCTestPayload(modelID string) map[string]any {
-	return map[string]any{
-		"model": modelID,
-		"messages": []map[string]any{
-			{"role": "user", "content": "hi"},
-		},
-		"stream":     true,
-		"max_tokens": 50,
-	}
-}
-
-// processOpenAICCStream processes an SSE stream in Chat Completions format.
-// Chunks carry content in choices[].delta.content; [DONE] or finish_reason signals completion.
-func (s *AccountTestService) processOpenAICCStream(c *gin.Context, body io.Reader) error {
-	reader := bufio.NewReader(body)
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-				return nil
-			}
-			return s.sendErrorAndEnd(c, fmt.Sprintf("Stream read error: %s", err.Error()))
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" || !sseDataPrefix.MatchString(line) {
-			continue
-		}
-
-		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
-		if jsonStr == "[DONE]" {
-			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-			return nil
-		}
-
-		var data map[string]any
-		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-			continue
-		}
-
-		// Top-level error field (some upstreams embed errors in the stream)
-		if errData, ok := data["error"].(map[string]any); ok {
-			errorMsg := "Unknown error"
-			if msg, ok := errData["message"].(string); ok && msg != "" {
-				errorMsg = msg
-			}
-			return s.sendErrorAndEnd(c, errorMsg)
-		}
-
-		choices, _ := data["choices"].([]any)
-		for _, choice := range choices {
-			choiceMap, ok := choice.(map[string]any)
-			if !ok {
-				continue
-			}
-			if delta, ok := choiceMap["delta"].(map[string]any); ok {
-				if content, ok := delta["content"].(string); ok && content != "" {
-					s.sendEvent(c, TestEvent{Type: "content", Text: content})
-				}
-			}
-			if finishReason, ok := choiceMap["finish_reason"].(string); ok && finishReason != "" && finishReason != "null" {
-				s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-				return nil
-			}
-		}
-	}
 }
 
 func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {

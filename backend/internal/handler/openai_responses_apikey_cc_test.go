@@ -58,7 +58,7 @@ func TestAPIKeyCCResponses_NonStream(t *testing.T) {
 		httpUp,
 		&service.DeferredService{},
 		nil, nil, nil, nil, nil,
-		nil,
+		nil, nil,
 	)
 
 	account := apikeyCCTestAccount(upstream.URL + "/v1/chat/completions")
@@ -130,7 +130,7 @@ func TestAPIKeyCCResponses_Stream(t *testing.T) {
 		httpUp,
 		&service.DeferredService{},
 		nil, nil, nil, nil, nil,
-		nil,
+		nil, nil,
 	)
 
 	account := apikeyCCTestAccount(upstream.URL + "/v1/chat/completions")

@@ -101,35 +101,35 @@ type AccountBulkUpdate struct {
 
 // CreateAccountRequest 创建账号请求
 type CreateAccountRequest struct {
-	Name               string         `json:"name"`
-	Notes              *string        `json:"notes"`
-	Platform           string         `json:"platform"`
-	Type               string         `json:"type"`
-	Credentials        map[string]any `json:"credentials"`
-	Extra              map[string]any `json:"extra"`
-	ProxyID            *int64         `json:"proxy_id"`
-	Concurrency        int            `json:"concurrency"`
-	Priority           int            `json:"priority"`
-	GroupIDs           []int64        `json:"group_ids"`
-	ExpiresAt               *time.Time `json:"expires_at"`
-	AutoPauseOnExpired      *bool      `json:"auto_pause_on_expired"`
-	StripReasoningEffortOnCC *bool     `json:"strip_reasoning_effort_on_cc"`
+	Name                     string         `json:"name"`
+	Notes                    *string        `json:"notes"`
+	Platform                 string         `json:"platform"`
+	Type                     string         `json:"type"`
+	Credentials              map[string]any `json:"credentials"`
+	Extra                    map[string]any `json:"extra"`
+	ProxyID                  *int64         `json:"proxy_id"`
+	Concurrency              int            `json:"concurrency"`
+	Priority                 int            `json:"priority"`
+	GroupIDs                 []int64        `json:"group_ids"`
+	ExpiresAt                *time.Time     `json:"expires_at"`
+	AutoPauseOnExpired       *bool          `json:"auto_pause_on_expired"`
+	StripReasoningEffortOnCC *bool          `json:"strip_reasoning_effort_on_cc"`
 }
 
 // UpdateAccountRequest 更新账号请求
 type UpdateAccountRequest struct {
-	Name               *string         `json:"name"`
-	Notes              *string         `json:"notes"`
-	Credentials        *map[string]any `json:"credentials"`
-	Extra              *map[string]any `json:"extra"`
-	ProxyID            *int64          `json:"proxy_id"`
-	Concurrency        *int            `json:"concurrency"`
-	Priority           *int            `json:"priority"`
-	Status             *string         `json:"status"`
-	GroupIDs           *[]int64        `json:"group_ids"`
-	ExpiresAt               *time.Time `json:"expires_at"`
-	AutoPauseOnExpired      *bool      `json:"auto_pause_on_expired"`
-	StripReasoningEffortOnCC *bool     `json:"strip_reasoning_effort_on_cc"`
+	Name                     *string         `json:"name"`
+	Notes                    *string         `json:"notes"`
+	Credentials              *map[string]any `json:"credentials"`
+	Extra                    *map[string]any `json:"extra"`
+	ProxyID                  *int64          `json:"proxy_id"`
+	Concurrency              *int            `json:"concurrency"`
+	Priority                 *int            `json:"priority"`
+	Status                   *string         `json:"status"`
+	GroupIDs                 *[]int64        `json:"group_ids"`
+	ExpiresAt                *time.Time      `json:"expires_at"`
+	AutoPauseOnExpired       *bool           `json:"auto_pause_on_expired"`
+	StripReasoningEffortOnCC *bool           `json:"strip_reasoning_effort_on_cc"`
 }
 
 // AccountService 账号管理服务
@@ -193,7 +193,7 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 			if err != nil {
 				return nil, err
 			}
-			if g.RequireOAuthOnly && (g.Platform == PlatformOpenAI || g.Platform == PlatformAntigravity || g.Platform == PlatformAnthropic || g.Platform == PlatformGemini) {
+			if g.RequireOAuthOnly && (g.Platform == PlatformOpenAI || g.Platform == PlatformAntigravity || g.Platform == PlatformAnthropic || g.Platform == PlatformGemini || g.Platform == PlatformGrok) {
 				return nil, fmt.Errorf("分组 [%s] 仅允许 OAuth 账号，apikey 类型账号无法加入", g.Name)
 			}
 		}
@@ -312,7 +312,7 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 			if err != nil {
 				return nil, err
 			}
-			if g.RequireOAuthOnly && (g.Platform == PlatformOpenAI || g.Platform == PlatformAntigravity || g.Platform == PlatformAnthropic || g.Platform == PlatformGemini) {
+			if g.RequireOAuthOnly && (g.Platform == PlatformOpenAI || g.Platform == PlatformAntigravity || g.Platform == PlatformAnthropic || g.Platform == PlatformGemini || g.Platform == PlatformGrok) {
 				return nil, fmt.Errorf("分组 [%s] 仅允许 OAuth 账号，apikey 类型账号无法加入", g.Name)
 			}
 		}
@@ -434,6 +434,9 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return nil
 	case PlatformGemini:
 		// TODO: 测试Gemini API凭证
+		return nil
+	case PlatformGrok:
+		// Grok OAuth credentials are validated via token exchange/refresh and request-path probes.
 		return nil
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)

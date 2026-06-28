@@ -416,10 +416,10 @@ func (s *GatewayService) bufferAnthropicFromCC(
 		}
 		for _, ch := range chk.Choices {
 			if ch.Delta.Content != nil {
-				contentBuf.WriteString(*ch.Delta.Content)
+				_, _ = contentBuf.WriteString(*ch.Delta.Content)
 			}
 			if ch.Delta.ReasoningContent != nil {
-				reasoningBuf.WriteString(*ch.Delta.ReasoningContent)
+				_, _ = reasoningBuf.WriteString(*ch.Delta.ReasoningContent)
 			}
 			for _, tc := range ch.Delta.ToolCalls {
 				idx := 0
@@ -439,7 +439,7 @@ func (s *GatewayService) bufferAnthropicFromCC(
 					st.Name = tc.Function.Name
 				}
 				if tc.Function.Arguments != "" {
-					st.Arguments.WriteString(tc.Function.Arguments)
+					_, _ = st.Arguments.WriteString(tc.Function.Arguments)
 				}
 			}
 			if ch.FinishReason != nil && *ch.FinishReason != "" {
