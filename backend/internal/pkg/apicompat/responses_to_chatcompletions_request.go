@@ -19,30 +19,6 @@ type ConvertResponsesOptions struct {
 	PreserveInstructionsField bool
 }
 
-// ResponsesToChatCompletionsRequest converts an OpenAI Responses API request
-// into a Chat Completions request. This is the reverse of
-// ChatCompletionsToResponses and enables Chat-Completions-only upstreams to
-// accept Responses API traffic by translating it back to the native
-// /v1/chat/completions format before forwarding.
-//
-// Field mapping:
-//   - input  (array)        → messages          (system/user/assistant/tool 角色还原)
-//   - tools                 → tools
-//   - tool_choice           → tool_choice
-//   - temperature           → temperature
-//   - top_p                 → top_p
-//   - max_output_tokens     → max_tokens
-//   - stream                → stream
-//   - reasoning.effort      → reasoning_effort
-//   - instructions          → instructions     (前置为 system 消息保留语义同时透传字段)
-//
-// Unsupported fields (previous_response_id / prompt_cache_key /
-// service_tier-only / parallel_tool_calls / store / include / text 等) 不会丢失
-// 关键语义但会以 debug 日志形式记录被忽略，便于上游排障。
-func ResponsesToChatCompletionsRequest(req *ResponsesRequest) (*ChatCompletionsRequest, error) {
-	return ResponsesToChatCompletionsRequestWithOptions(req, ConvertResponsesOptions{})
-}
-
 // ResponsesToChatCompletionsRequestWithOptions is like ResponsesToChatCompletionsRequest
 // but accepts options to control conversion behaviour.
 func ResponsesToChatCompletionsRequestWithOptions(req *ResponsesRequest, opts ConvertResponsesOptions) (*ChatCompletionsRequest, error) {
