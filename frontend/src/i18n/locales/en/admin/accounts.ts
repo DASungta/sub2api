@@ -660,6 +660,10 @@ export default {
           official: 'Official API'
         }
       },
+      grokClientToolCache: {
+        title: 'Client Tool Cache (May Change Automatic Tool Selection)',
+        hint: 'For detected Grok Free OAuth accounts, this is enabled by default for client function tools such as Codex and Trae. Turn it off to opt out if the automatic tool-selection behavior is not acceptable.'
+      },
       autoPauseOnExpired: 'Auto Pause On Expired',
       autoPauseOnExpiredDesc: 'When enabled, the account will auto pause scheduling after it expires',
       stripReasoningEffortOnCC: 'Strip reasoning_effort (Chat Completions)',
