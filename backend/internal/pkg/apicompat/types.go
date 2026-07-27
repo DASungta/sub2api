@@ -4,7 +4,10 @@
 // formats can be served through a unified gateway.
 package apicompat
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+)
 
 // ---------------------------------------------------------------------------
 // Anthropic Messages API types
@@ -112,7 +115,7 @@ type AnthropicTool struct {
 	Type         string                 `json:"type,omitempty"` // e.g. "web_search_20250305" for server tools
 	Name         string                 `json:"name"`
 	Description  string                 `json:"description,omitempty"`
-	InputSchema  json.RawMessage        `json:"input_schema"` // JSON Schema object
+	InputSchema  json.RawMessage        `json:"input_schema,omitempty"` // JSON Schema object
 	CacheControl *AnthropicCacheControl `json:"cache_control,omitempty"`
 }
 
@@ -269,53 +272,37 @@ type ResponsesInputItem struct {
 	ID        string `json:"id,omitempty"`
 
 	// type=function_call_output
-	Output string `json:"output,omitempty"`
+	Output    string `json:"output,omitempty"`
+	outputRaw json.RawMessage
 
 	// type=reasoning
 	Summary []ResponsesSummary `json:"summary,omitempty"`
 }
 
-// UnmarshalJSON accepts Responses function_call_output.output in both the
-// official string form and the object/array forms commonly emitted by gateway
-// clients. Object/array values are compacted into a JSON string so existing
-// conversion code can keep treating Output as Chat Completions tool message
-// content.
-func (it *ResponsesInputItem) UnmarshalJSON(data []byte) error {
-	type responsesInputItemAlias ResponsesInputItem
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
+func (i *ResponsesInputItem) UnmarshalJSON(data []byte) error {
+	type alias ResponsesInputItem
+	var wire struct {
+		*alias
+		Output json.RawMessage `json:"output"`
 	}
-	output := fields["output"]
-	delete(fields, "output")
-	withoutOutput, err := json.Marshal(fields)
-	if err != nil {
-		return err
-	}
-	var alias responsesInputItemAlias
-	if err := json.Unmarshal(withoutOutput, &alias); err != nil {
-		return err
-	}
-	*it = ResponsesInputItem(alias)
-	it.Output = decodeResponsesFunctionOutput(output)
-	return nil
-}
 
-func decodeResponsesFunctionOutput(raw json.RawMessage) string {
-	if len(raw) == 0 || string(raw) == "null" {
-		return ""
+	*i = ResponsesInputItem{}
+	wire.alias = (*alias)(i)
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
 	}
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil {
-		return s
+
+	output := bytes.TrimSpace(wire.Output)
+	if len(output) == 0 || bytes.Equal(output, []byte("null")) {
+		return nil
 	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err == nil {
-		if b, err := json.Marshal(v); err == nil {
-			return string(b)
-		}
+	if err := json.Unmarshal(output, &i.Output); err == nil {
+		return nil
 	}
-	return string(raw)
+
+	i.outputRaw = append(i.outputRaw[:0], output...)
+	i.Output = string(output)
+	return nil
 }
 
 // ResponsesContentPart is a typed content part in a Responses message.
