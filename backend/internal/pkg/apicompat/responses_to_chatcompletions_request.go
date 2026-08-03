@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 )
 
 // ConvertResponsesOptions controls optional behaviour during Responses→ChatCompletions conversion.
@@ -113,95 +112,16 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 		return []ChatMessage{{Role: "user", Content: content}}, nil
 	}
 
-	var items []ResponsesInputItem
-	if err := json.Unmarshal(raw, &items); err != nil {
+	var rawItems []json.RawMessage
+	if err := json.Unmarshal(raw, &rawItems); err != nil {
 		return nil, fmt.Errorf("input is neither string nor array: %w", err)
 	}
 
-	out := make([]ChatMessage, 0, len(items))
-	// 多个 assistant function_call 在 Chat Completions 中需要合并到同一条
-	// assistant 消息的 tool_calls 数组里；用游标跟踪最后一条 assistant 消息。
-	lastAssistantIdx := -1
-	var pendingReasoning string
-
-	for _, it := range items {
-		switch it.Type {
-		case "reasoning":
-			if reasoning := responsesInputReasoningText(it); reasoning != "" {
-				pendingReasoning = reasoning
-			}
-			continue
-		case "function_call":
-			tc := ChatToolCall{
-				ID:   it.CallID,
-				Type: "function",
-				Function: ChatFunctionCall{
-					Name:      it.Name,
-					Arguments: it.Arguments,
-				},
-			}
-			if lastAssistantIdx >= 0 && out[lastAssistantIdx].Role == "assistant" {
-				out[lastAssistantIdx].ToolCalls = append(out[lastAssistantIdx].ToolCalls, tc)
-			} else {
-				out = append(out, ChatMessage{
-					Role:             "assistant",
-					ToolCalls:        []ChatToolCall{tc},
-					ReasoningContent: pendingReasoning,
-				})
-				lastAssistantIdx = len(out) - 1
-			}
-			if out[lastAssistantIdx].ReasoningContent == "" {
-				out[lastAssistantIdx].ReasoningContent = pendingReasoning
-			}
-			pendingReasoning = ""
-		case "function_call_output":
-			content, err := json.Marshal(it.Output)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, ChatMessage{
-				Role:       "tool",
-				ToolCallID: it.CallID,
-				Content:    content,
-			})
-			lastAssistantIdx = -1
-			pendingReasoning = ""
-		case "", "message":
-			role := it.Role
-			if role == "" {
-				role = "user"
-			}
-			// Responses API 把 system 角色叫 "developer"，回退兼容。
-			if role == "developer" {
-				role = "system"
-			}
-			content, err := convertResponsesContentToChat(role, it.Content)
-			if err != nil {
-				return nil, err
-			}
-			msg := ChatMessage{Role: role, Content: content}
-			out = append(out, msg)
-			if role == "assistant" {
-				lastAssistantIdx = len(out) - 1
-			} else {
-				lastAssistantIdx = -1
-				pendingReasoning = ""
-			}
-		default:
-			// 未识别 type 兜底为 user 文本，避免静默丢失。
-			slog.Debug("apicompat: unknown Responses input item type, fallback to user message",
-				slog.String("type", it.Type))
-			content, err := convertResponsesContentToChat("user", it.Content)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, ChatMessage{Role: "user", Content: content})
-			lastAssistantIdx = -1
-			pendingReasoning = ""
-		}
+	built, mediaByCallID, err := buildChatMessagesFromItems(nil, rawItems)
+	if err != nil {
+		return nil, err
 	}
-
-	return normalizeChatMessagesForToolCallPairs(out), nil
+	return normalizeChatMessagesForToolCallPairs(built, mediaByCallID), nil
 }
 
 // normalizeChatMessagesForToolCallPairs enforces the Chat Completions invariant
@@ -213,7 +133,7 @@ func convertResponsesInputToChatMessages(raw json.RawMessage) ([]ChatMessage, er
 // messages". Unanswered tool calls are removed from the assistant message, and
 // orphan tool messages are preserved as user-visible text instead of illegal
 // role=tool messages.
-func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage {
+func normalizeChatMessagesForToolCallPairs(messages []ChatMessage, mediaByCallID toolOutputMediaByCallID) []ChatMessage {
 	replies := make(map[string]ChatMessage)
 	for _, msg := range messages {
 		if msg.Role == "tool" && msg.ToolCallID != "" {
@@ -243,6 +163,14 @@ func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage
 			}
 			if msg.ToolCallID == "" || !pairedIDs[msg.ToolCallID] {
 				out = append(out, orphanToolMessageAsUser(msg))
+				if media := mediaByCallID[msg.ToolCallID]; len(media) > 0 {
+					parts := append([]ChatContentPart{{
+						Type: "text",
+						Text: fmt.Sprintf(toolOutputMediaAttribution, msg.ToolCallID),
+					}}, media...)
+					content, _ := json.Marshal(parts)
+					out = append(out, ChatMessage{Role: "user", Content: content})
+				}
 			}
 			continue
 		}
@@ -281,25 +209,26 @@ func normalizeChatMessagesForToolCallPairs(messages []ChatMessage) []ChatMessage
 				out = append(out, replies[tc.ID])
 			}
 		}
+
+		var mediaParts []ChatContentPart
+		for _, tc := range validCalls {
+			media := mediaByCallID[tc.ID]
+			if len(media) == 0 {
+				continue
+			}
+			mediaParts = append(mediaParts, ChatContentPart{
+				Type: "text",
+				Text: fmt.Sprintf(toolOutputMediaAttribution, tc.ID),
+			})
+			mediaParts = append(mediaParts, media...)
+		}
+		if len(mediaParts) > 0 {
+			content, _ := json.Marshal(mediaParts)
+			out = append(out, ChatMessage{Role: "user", Content: content})
+		}
 	}
 
 	return out
-}
-
-func responsesInputReasoningText(item ResponsesInputItem) string {
-	if len(item.Summary) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(item.Summary))
-	for _, summary := range item.Summary {
-		if summary.Text != "" {
-			parts = append(parts, summary.Text)
-		}
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, "\n")
 }
 
 func chatMessageHasNonEmptyContent(msg ChatMessage) bool {
@@ -329,64 +258,6 @@ func orphanToolMessageAsUser(msg ChatMessage) ChatMessage {
 	}
 	content, _ := json.Marshal(text)
 	return ChatMessage{Role: "user", Content: content}
-}
-
-// convertResponsesContentToChat 把 Responses 的 message.content 还原为 Chat
-// Completions 的 content。两种形式：字符串原样透传；对象数组转换为
-// ChatContentPart 数组（input_text/output_text → text；input_image → image_url）。
-func convertResponsesContentToChat(role string, raw json.RawMessage) (json.RawMessage, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil {
-		return json.Marshal(s)
-	}
-
-	var parts []ResponsesContentPart
-	if err := json.Unmarshal(raw, &parts); err != nil {
-		return nil, fmt.Errorf("parse content as string or parts array: %w", err)
-	}
-
-	// assistant 角色：仅取文本拼接为字符串，保持与 Chat Completions 习惯一致。
-	if role == "assistant" {
-		var b string
-		for _, p := range parts {
-			if p.Type == "output_text" || p.Type == "input_text" {
-				b += p.Text
-			}
-		}
-		return json.Marshal(b)
-	}
-
-	chatParts := make([]ChatContentPart, 0, len(parts))
-	for _, p := range parts {
-		switch p.Type {
-		case "input_text", "output_text", "text":
-			if p.Text == "" {
-				continue
-			}
-			chatParts = append(chatParts, ChatContentPart{Type: "text", Text: p.Text})
-		case "input_image":
-			if p.ImageURL == "" {
-				continue
-			}
-			chatParts = append(chatParts, ChatContentPart{
-				Type:     "image_url",
-				ImageURL: &ChatImageURL{URL: p.ImageURL},
-			})
-		default:
-			slog.Debug("apicompat: unknown Responses content part type",
-				slog.String("type", p.Type))
-		}
-	}
-
-	// 单一 text part 折叠为字符串，以贴近 Chat Completions 的常见形态。
-	if len(chatParts) == 1 && chatParts[0].Type == "text" {
-		return json.Marshal(chatParts[0].Text)
-	}
-	return json.Marshal(chatParts)
 }
 
 // convertResponsesToolsToChat 把 Responses 的 tool 定义还原为 Chat Completions
