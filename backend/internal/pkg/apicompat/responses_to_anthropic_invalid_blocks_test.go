@@ -164,13 +164,6 @@ func TestResponsesToAnthropic_CodexToolRoundStaysIntactAndSendable(t *testing.T)
 	require.NotContains(t, string(mustMarshal(t, messages)), "gAAAA")
 }
 
-func mustMarshal(t *testing.T, v any) []byte {
-	t.Helper()
-	b, err := json.Marshal(v)
-	require.NoError(t, err)
-	return b
-}
-
 func TestAnthropicContentIsEmpty(t *testing.T) {
 	cases := []struct {
 		raw  string
