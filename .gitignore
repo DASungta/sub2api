@@ -158,3 +158,6 @@ newapi-codex-channels-*.json
 frontend/package-lock.json
 # 合并冲突备份
 *.orig
+
+# Vitest / Vite cache at repo root
+.vite/
