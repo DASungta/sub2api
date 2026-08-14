@@ -1,0 +1,12 @@
+{
+  "id": "upstream-sync-release-20260814",
+  "title": "合并 upstream/main，发布 DockerHub 并部署两台服务器",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack-release",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并推送归档提交",
+  "createdAt": "2026-08-14T00:00:00+08:00",
+  "branch": "main"
+}

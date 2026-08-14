@@ -1,0 +1,3 @@
+{"path":"AGENTS.md","reason":"Repository build, release, and deployment requirements"}
+{"path":"deploy/deploy-to-server.sh","reason":"Required two-host deployment workflow"}
+{"path":"backend/cmd/server/VERSION","reason":"Authoritative Docker version tag"}
