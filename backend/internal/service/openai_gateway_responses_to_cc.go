@@ -474,7 +474,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketTurnAsChatCompletions(
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 	upstreamReq.Header.Set("Content-Type", "application/json")
-	upstreamReq.Header.Set("Authorization", "Bearer "+forwardReq.apiKey)
+	applyOpenAICompatibleAPIKeyAuth(upstreamReq, account, forwardReq.apiKey)
 	upstreamReq.Header.Set("Accept", "text/event-stream")
 	for key, values := range c.Request.Header {
 		if openaiCCRawAllowedHeaders[strings.ToLower(key)] {
@@ -507,6 +507,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketTurnAsChatCompletions(
 		return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 	}
 
+	logUpstreamTraceID(ctx, account, resp.Header, forwardReq.originalModel)
 	requestID := resp.Header.Get("x-request-id")
 	state := apicompat.NewCCStreamState()
 	state.Model = forwardReq.originalModel

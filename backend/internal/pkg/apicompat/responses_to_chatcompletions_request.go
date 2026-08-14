@@ -18,9 +18,10 @@ type ConvertResponsesOptions struct {
 	PreserveInstructionsField bool
 }
 
-// ResponsesToChatCompletionsRequestWithOptions is like ResponsesToChatCompletionsRequest
-// but accepts options to control conversion behaviour.
-func ResponsesToChatCompletionsRequestWithOptions(req *ResponsesRequest, opts ConvertResponsesOptions) (*ChatCompletionsRequest, error) {
+// responsesToChatCompletionsRequestBase performs the fork-specific scalar and
+// message conversion. The public entry points layer effective-tool handling on
+// top in chatcompletions_responses_bridge.go.
+func responsesToChatCompletionsRequestBase(req *ResponsesRequest, opts ConvertResponsesOptions) (*ChatCompletionsRequest, error) {
 	if req == nil {
 		return nil, fmt.Errorf("nil ResponsesRequest")
 	}
